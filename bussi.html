@@ -3,9 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bussiaikataulu</title>
+<title>Bussiaikataulu + Kalenteri</title>
 
-<!-- iPad fullscreen -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 
@@ -16,65 +15,61 @@
         color: white;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
+    #container { padding: 30px; }
 
-    #container {
-        padding: 40px;
-    }
-
-    #stop {
+    #stop, #calendar-title {
         font-size: 48px;
         font-weight: bold;
         text-align: center;
-        margin-bottom: 40px;
+        margin: 20px 0;
     }
 
     .card {
         display: flex;
         align-items: center;
-        border: 4px solid #444;
-        border-radius: 16px;
-        padding: 30px;
-        margin-bottom: 30px;
+        border: 3px solid #444;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
     }
 
-    .line {
-        flex: 1;
-        font-size: 88px;
-        font-weight: bold;
-    }
-
-    .time {
-        flex: 1;
-        font-size: 88px;
-        text-align: center;
-        font-weight: bold;
-    }
-
-    .delay {
-        flex: 1;
-        font-size: 64px;
-        text-align: right;
-        font-weight: bold;
-    }
+    .line { flex: 1; font-size: 72px; font-weight: bold; }
+    .time { flex: 1; font-size: 72px; text-align: center; font-weight: bold; }
+    .delay { flex: 1; font-size: 60px; text-align: right; font-weight: bold; }
 
     .ok { color: #00ff00; }
     .warn { color: #ffcc00; }
     .bad { color: #ff4444; }
+
+    ul.calendar-list {
+        font-size: 32px;
+        padding-left: 20px;
+    }
+    ul.calendar-list li {
+        margin-bottom: 8px;
+    }
 </style>
 </head>
 
 <body>
 <div id="container">
-    <div id="stop">Ladataan…</div>
+
+    <div id="stop">Ladataan bussiaikataulu…</div>
     <div id="cards"></div>
+
+    <div id="calendar-title">Lepa P15 Kilpa – Kalenteri</div>
+    <div id="myclub">Ladataan kalenteria…</div>
+
 </div>
 
 <script>
-const STOP_ID = "HSL:2132245"; // Trillakatu
+const STOP_ID = "HSL:2132245";
 const API_KEY = "0f78f242bf544ab1af1549eb047efc6e";
 const API_URL = "https://api.digitransit.fi/routing/v2/hsl/gtfs/v1";
 
-async function loadData() {
+const MYCLUB_ICS = "https://lepa.myclub.fi/groups/68436/event_embeds/12444.ics?token=99b62805c5609b38a5b90a8cf7be039a8b88a853";
+
+async function loadBussit() {
     const query = `
     {
       stop(id: "${STOP_ID}") {
@@ -89,56 +84,108 @@ async function loadData() {
       }
     }`;
 
-    const res = await fetch(API_URL, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "digitransit-subscription-key": API_KEY
-        },
-        body: JSON.stringify({ query })
-    });
+    try {
+        const res = await fetch(API_URL, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "digitransit-subscription-key": API_KEY
+            },
+            body: JSON.stringify({ query })
+        });
+        const json = await res.json();
+        document.getElementById("stop").textContent = json.data.stop.name;
 
-    const json = await res.json();
-    if (!json.data) return;
+        const now = new Date();
+        const cards = document.getElementById("cards");
+        cards.innerHTML = "";
 
-    document.getElementById("stop").textContent = json.data.stop.name;
+        let shown = 0;
+        for (const d of json.data.stop.stoptimesWithoutPatterns) {
+            if (shown >= 3) break;
+            const depSec = d.realtimeDeparture ?? d.scheduledDeparture;
+            const depTime = new Date((d.serviceDay + depSec) * 1000);
+            if (depTime < now) continue;
 
-    const now = new Date();
-    const cards = document.getElementById("cards");
-    cards.innerHTML = "";
+            const delayMin = Math.round((d.departureDelay || 0) / 60);
+            let cls = "ok";
+            if (delayMin > 2) cls = "warn";
+            if (delayMin > 5) cls = "bad";
 
-    let shown = 0;
-
-    for (const d of json.data.stop.stoptimesWithoutPatterns) {
-        if (shown >= 3) break;
-
-        const depSec = d.realtimeDeparture ?? d.scheduledDeparture;
-        const depTime = new Date((d.serviceDay + depSec) * 1000);
-
-        if (depTime < now) continue;
-
-        const delayMin = Math.round((d.departureDelay || 0) / 60);
-        let cls = "ok";
-        if (delayMin > 2) cls = "warn";
-        if (delayMin > 5) cls = "bad";
-
-        cards.innerHTML += `
-            <div class="card">
-                <div class="line ${cls}">${d.trip.route.shortName}</div>
-                <div class="time ${cls}">
-                    ${depTime.toLocaleTimeString("fi-FI", {hour: "2-digit", minute: "2-digit"})}
-                </div>
-                <div class="delay ${cls}">
-                    ${delayMin > 0 ? "+" + delayMin + " min" : ""}
-                </div>
-            </div>
-        `;
-        shown++;
+            cards.innerHTML += `
+                <div class="card">
+                    <div class="line ${cls}">${d.trip.route.shortName}</div>
+                    <div class="time ${cls}">
+                        ${depTime.toLocaleTimeString("fi-FI", {hour:"2-digit",minute:"2-digit"})}
+                    </div>
+                    <div class="delay ${cls}">
+                        ${delayMin > 0 ? "+"+delayMin+" min" : ""}
+                    </div>
+                </div>`;
+            shown++;
+        }
+    } catch (e) {
+        document.getElementById("stop").textContent = "Bussidata ei saatavilla";
+        console.error(e);
     }
 }
 
-loadData();
-setInterval(loadData, 30000);
+async function loadMyClub() {
+    const proxy = "https://api.allorigins.win/raw?url=" + encodeURIComponent(MYCLUB_ICS);
+
+    try {
+        const res = await fetch(proxy);
+        const text = await res.text();
+        const lines = text.split("\n");
+
+        let events = [];
+        let current = {};
+        for (const line of lines) {
+            if (line.startsWith("BEGIN:VEVENT")) {
+                current = {};
+            } else if (line.startsWith("DTSTART")) {
+                const dateStr = line.split(":")[1].trim();
+                current.date = dateStr;
+            } else if (line.startsWith("SUMMARY:")) {
+                current.title = line.substring(8).trim();
+            } else if (line.startsWith("END:VEVENT")) {
+                if (current.date && current.title) events.push(current);
+            }
+        }
+
+        events.sort((a,b) => a.date.localeCompare(b.date));
+
+        const now = new Date().toISOString().replace(/[-:]/g,"").slice(0,8);
+        let html = "<ul class='calendar-list'>";
+        let count = 0;
+
+        for (const ev of events) {
+            if (count >= 5) break;
+            if (ev.date >= now) {
+                const d = new Date(
+                    ev.date.substring(0,4),
+                    ev.date.substring(4,6)-1,
+                    ev.date.substring(6,8)
+                );
+                html += `<li>${d.toLocaleDateString("fi-FI")} – ${ev.title}</li>`;
+                count++;
+            }
+        }
+        html += "</ul>";
+
+        document.getElementById("myclub").innerHTML = html;
+    } catch (e) {
+        document.getElementById("myclub").textContent = "Kalenteria ei saatavilla";
+        console.error(e);
+    }
+}
+
+loadBussit();
+loadMyClub();
+setInterval(loadBussit, 30000);
+setInterval(loadMyClub, 300000);
 </script>
+
 </body>
 </html>
+
