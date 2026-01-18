@@ -54,8 +54,9 @@
     ul.calendar-list li {
         margin-bottom: 6px;
     }
-    ul.calendar-list li.practice { color: #ffcc00; } /* keltainen harjoituksille */
-    ul.calendar-list li.game { color: #00ff00; }     /* vihreä peleille */
+    ul.calendar-list li.practice { color: #ffcc00; } /* harjoitukset keltainen */
+    ul.calendar-list li.game { color: #00ff00; }     /* pelit vihreä */
+    ul.calendar-list li.today { font-weight: bold; text-decoration: underline; } /* tänään */
 </style>
 </head>
 
@@ -187,7 +188,8 @@ async function loadMyClub() {
 
         events.sort((a,b) => (a.date+a.time).localeCompare(b.date+b.time));
 
-        const now = new Date().toISOString().replace(/[-:]/g,"").slice(0,8);
+        const todayStr = new Date().toISOString().replace(/[-:]/g,"").slice(0,8);
+        const now = todayStr;
         let html = "<ul class='calendar-list'>";
         let count = 0;
 
@@ -206,7 +208,9 @@ async function loadMyClub() {
                 if (ev.title.toLowerCase().includes("harjoitus")) cls = "practice";
                 else if (ev.title.toLowerCase().includes("peli") || ev.title.toLowerCase().includes("talviliiga")) cls = "game";
 
-                html += `<li class="${cls}">${d.toLocaleDateString("fi-FI")} ${hh}:${mm} – ${ev.title}</li>`;
+                let todayCls = (ev.date === todayStr) ? "today" : "";
+
+                html += `<li class="${cls} ${todayCls}">${d.toLocaleDateString("fi-FI")} ${hh}:${mm} – ${ev.title}</li>`;
                 count++;
             }
         }
