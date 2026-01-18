@@ -151,7 +151,8 @@ async function loadMyClub() {
                 current = {};
             } else if (line.startsWith("DTSTART")) {
                 const dateStr = line.split(":")[1].trim();
-                current.date = dateStr;
+                current.date = dateStr.substring(0,8);
+                current.time = dateStr.substring(8,12); // HHMM
             } else if (line.startsWith("SUMMARY:")) {
                 current.title = line.substring(8).trim();
             } else if (line.startsWith("END:VEVENT")) {
@@ -159,7 +160,7 @@ async function loadMyClub() {
             }
         }
 
-        events.sort((a,b) => a.date.localeCompare(b.date));
+        events.sort((a,b) => (a.date+a.time).localeCompare(b.date+b.time));
 
         const now = new Date().toISOString().replace(/[-:]/g,"").slice(0,8);
         let html = "<ul class='calendar-list'>";
@@ -173,7 +174,9 @@ async function loadMyClub() {
                     ev.date.substring(4,6)-1,
                     ev.date.substring(6,8)
                 );
-                html += `<li>${d.toLocaleDateString("fi-FI")} – ${ev.title}</li>`;
+                const hh = ev.time ? ev.time.substring(0,2) : "00";
+                const mm = ev.time ? ev.time.substring(2,4) : "00";
+                html += `<li>${d.toLocaleDateString("fi-FI")} ${hh}:${mm} – ${ev.title}</li>`;
                 count++;
             }
         }
