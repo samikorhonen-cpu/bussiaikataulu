@@ -48,6 +48,8 @@
     ul.calendar-list li {
         margin-bottom: 6px;
     }
+    ul.calendar-list li.practice { color: #ffcc00; } /* keltainen harjoituksille */
+    ul.calendar-list li.game { color: #00ff00; }     /* vihreä peleille */
 </style>
 </head>
 
@@ -150,9 +152,14 @@ async function loadMyClub() {
             if (line.startsWith("BEGIN:VEVENT")) {
                 current = {};
             } else if (line.startsWith("DTSTART")) {
-                const dateStr = line.split(":")[1].trim();
-                current.date = dateStr.substring(0,8);
-                current.time = dateStr.substring(8,12); // HHMM
+                let dateStr = line.split(":")[1].trim();
+                if(dateStr.includes("T")) {
+                    current.date = dateStr.substring(0,8);
+                    current.time = dateStr.substring(9,13); // HHMM
+                } else {
+                    current.date = dateStr;
+                    current.time = "0000";
+                }
             } else if (line.startsWith("SUMMARY:")) {
                 current.title = line.substring(8).trim();
             } else if (line.startsWith("END:VEVENT")) {
@@ -176,7 +183,12 @@ async function loadMyClub() {
                 );
                 const hh = ev.time ? ev.time.substring(0,2) : "00";
                 const mm = ev.time ? ev.time.substring(2,4) : "00";
-                html += `<li>${d.toLocaleDateString("fi-FI")} ${hh}:${mm} – ${ev.title}</li>`;
+
+                let cls = "";
+                if (ev.title.toLowerCase().includes("harjoitus")) cls = "practice";
+                else if (ev.title.toLowerCase().includes("peli") || ev.title.toLowerCase().includes("talviliiga") ) cls = "game";
+
+                html += `<li class="${cls}">${d.toLocaleDateString("fi-FI")} ${hh}:${mm} – ${ev.title}</li>`;
                 count++;
             }
         }
